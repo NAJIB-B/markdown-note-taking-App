@@ -103,5 +103,6 @@ exports.renderNote = catchAsync( async(req, res, next) => {
  const data = await fs.readFile(filePath, 'utf8')
 
   const html = md.render(data)
+  deleteFile(filePath)
   res.status(200).send(html)
 })
