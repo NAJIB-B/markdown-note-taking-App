@@ -7,6 +7,7 @@ const path = require("path")
 const querystring = require("querystring")
 
 const AppError = require("../utils/appError")
+const Note = require("../models/noteModal")
 const catchAsync = require("../utils/catchAsync")
 
 
@@ -18,6 +19,10 @@ fs.unlink(path)
 }
 
 const validateFile = (file) => {
+
+  if (file.size <= 0) {
+    throw new AppError("The file shouldn't be empty", 400)
+  }
 
   if (!(file.originalname.endsWith(".md"))) {
     throw new AppError("The file should be a markdown file i.e ends with '.md'", 400)
@@ -40,9 +45,16 @@ exports.uploadFile = catchAsync( async(req, res, next) => {
   
   const filePath = path.join(__dirname, '..', req.file.path) 
  const data = await fs.readFile(filePath, 'utf8')
+
+  const note = await Note.create({
+    title: req.file.filename,
+    markdownContent: data
+  })
+  
   deleteFile(filePath)
-  res.status(200).json({
-    message: "success"
+  res.status(201).json({
+    message: "success",
+    markdownNote: note
   })
 })
 
@@ -77,3 +89,19 @@ exports.checkGrammar = catchAsync( async(req, res, next) => {
     data
   })
 }) 
+
+
+exports.renderNote = catchAsync( async(req, res, next) => {
+
+  if (!req.file) {
+    return next(new AppError('No uploaded file found', 400))
+  }
+
+  validateFile(req.file)
+  
+  const filePath = path.join(__dirname, '..', req.file.path) 
+ const data = await fs.readFile(filePath, 'utf8')
+
+  const html = md.render(data)
+  res.status(200).send(html)
+})
