@@ -11,7 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static(path.join(__dirname, 'public')))
 
-app.use("/", noteRouter)
+app.use("/api/v1/note", noteRouter)
 
 app.all("*", (req, res) => {
 

@@ -1,108 +1,131 @@
-const markdownit = require("markdown-it")
-const {markdownToTxt} = require("markdown-to-txt")
-const axios = require("axios")
+const markdownit = require("markdown-it");
+const { markdownToTxt } = require("markdown-to-txt");
+const axios = require("axios");
 
-const fs = require("node:fs/promises")
-const path = require("path")
-const querystring = require("querystring")
+const fs = require("node:fs/promises");
+const path = require("path");
+const querystring = require("querystring");
 
-const AppError = require("../utils/appError")
-const Note = require("../models/noteModal")
-const catchAsync = require("../utils/catchAsync")
+const AppError = require("../utils/appError");
+const Note = require("../models/noteModal");
+const catchAsync = require("../utils/catchAsync");
 
+const md = markdownit();
 
-const md = markdownit()
-
-
-const deleteFile = async(path) => {
-fs.unlink(path)
-}
+const deleteFile = async (path) => {
+  fs.unlink(path);
+};
 
 const validateFile = (file) => {
-
   if (file.size <= 0) {
-    throw new AppError("The file shouldn't be empty", 400)
+    throw new AppError("The file shouldn't be empty", 400);
   }
 
-  if (!(file.originalname.endsWith(".md"))) {
-    throw new AppError("The file should be a markdown file i.e ends with '.md'", 400)
+  if (!file.originalname.endsWith(".md")) {
+    throw new AppError(
+      "The file should be a markdown file i.e ends with '.md'",
+      400,
+    );
   }
-  const sizeInMb = file.size / (1024 * 1024)
+  const sizeInMb = file.size / (1024 * 1024);
 
   if (sizeInMb > 2) {
-    throw new AppError("The file exceeds the file limit. The limit is 2mb", 400) 
+    throw new AppError(
+      "The file exceeds the file limit. The limit is 2mb",
+      400,
+    );
   }
-}
+};
 
-
-
-exports.uploadFile = catchAsync( async(req, res, next) => {
+exports.uploadFile = catchAsync(async (req, res, next) => {
   if (!req.file) {
-    return next(new AppError('No uploaded file found', 400))
+    return next(new AppError("No uploaded file found", 400));
   }
 
-  validateFile(req.file)
-  
-  const filePath = path.join(__dirname, '..', req.file.path) 
- const data = await fs.readFile(filePath, 'utf8')
+  validateFile(req.file);
+
+  const filePath = path.join(__dirname, "..", req.file.path);
+  let data
+  try {
+    data = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    console.log(error);
+    return next(new AppError("Error reading the uploaded file", 500));
+  }
 
   const note = await Note.create({
     title: req.file.filename,
-    markdownContent: data
-  })
-  
-  deleteFile(filePath)
+    markdownContent: data,
+  });
+
+  deleteFile(filePath);
   res.status(201).json({
     message: "success",
-    markdownNote: note
-  })
-})
+    markdownNote: note,
+  });
+});
 
-
-
-
-exports.checkGrammar = catchAsync( async(req, res, next) => {
+exports.checkGrammar = catchAsync(async (req, res, next) => {
   if (!req.file) {
-    return next(new AppError('No uploaded file found', 400))
+    return next(new AppError("No uploaded file found", 400));
   }
 
+  validateFile(req.file);
 
-  validateFile(req.file)
-  
-  const filePath = path.join(__dirname, '..', req.file.path) 
-  const markdownText = await fs.readFile(filePath, 'utf8')
+  const filePath = path.join(__dirname, "..", req.file.path);
+  let markdownText
+  try {
+    markdownText = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    console.log(error);
+    return next(new AppError("Error reading the uploaded file", 500));
+  }
 
-  const text = markdownToTxt(markdownText)
+  const text = markdownToTxt(markdownText);
 
-  const grammarChecks = await axios.post("https://api.languagetoolplus.com/v2/check", querystring.stringify({
-    language: "en-US",
-    text 
-  }))
+  let grammarChecks
+  try {
+    grammarChecks = await axios.post(
+      "https://api.languagetoolplus.com/v2/check",
+      querystring.stringify({
+        language: "en-US",
+        text,
+      }),
+    );
+  } catch (error) {
+    console.log(error);
+    return next(
+      new AppError("Error contacting the grammar checking service", 500),
+    );
+  }
 
+  const data = grammarChecks.data.matches;
 
-  const data = grammarChecks.data.matches
-
-  deleteFile(filePath)
+  deleteFile(filePath);
 
   res.status(200).json({
     message: "success",
-    data
-  })
-}) 
+    data,
+  });
+});
 
-
-exports.renderNote = catchAsync( async(req, res, next) => {
-
+exports.renderNote = catchAsync(async (req, res, next) => {
   if (!req.file) {
-    return next(new AppError('No uploaded file found', 400))
+    return next(new AppError("No uploaded file found", 400));
   }
 
-  validateFile(req.file)
-  
-  const filePath = path.join(__dirname, '..', req.file.path) 
- const data = await fs.readFile(filePath, 'utf8')
+  validateFile(req.file);
 
-  const html = md.render(data)
-  deleteFile(filePath)
-  res.status(200).send(html)
-})
+  const filePath = path.join(__dirname, "..", req.file.path);
+  let data
+  try {
+    data = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    console.log(error);
+    return next(new AppError("Error reading the uploaded file", 500));
+  }
+
+  const html = md.render(data);
+  deleteFile(filePath);
+  res.status(200).send(html);
+});
